@@ -1,36 +1,45 @@
-use rusqlite::{Connection, Result, Error}; use crate::cli::Todo;
-use rusqlite::NO_PARAMS;
+use rusqlite::{Connection, Result, Error};
+use crate::cli::Todo;
 
+#[derive(Debug)]
 pub enum InsertError {
-    OpenConnectionError(Error)
+    OpenConnectionError(Error),
+    InsertError(Error),
+    CreationError(Error),
 }
 
 pub struct DBSuccess;
 
-pub fn create_table() -> Result<DBSuccess, Error> {
-    let conn = Connection::open("test.db")?;
-    conn.execute(
+pub fn get_connection() -> Result<Connection, Error> {
+   Connection::open("test.db")
+}
+
+pub fn create_table(conn: &Connection) -> Result<DBSuccess, Error> {
+    let _ = conn.execute(
         "CREATE TABLE IF NOT EXISTS todo (
             id text primary key, 
             name text not null
         )",
-        NO_PARAMS
+       () 
     )?;
 
     Ok(DBSuccess)
 }
 
 
-pub fn insert(todo: &Todo) -> Result<DBSuccess, InsertError> {
-    let conn = match Connection::open("test.db") {
-        Ok(connection) => connection,
-        Err(error) => return Err(InsertError::OpenConnectionError(error))
+pub fn insert(conn: &Connection, todo: &Todo) -> Result<DBSuccess, InsertError> {
+    match create_table(conn) {
+        Err(error) => return Err(InsertError::CreationError(error)),
+        Ok(_) => (),
     };
-    conn.execute("INSERT INTO test (name) VALUES (?1)", (&todo.name,));
-
-    Ok(DBSuccess)
+    let result = conn.execute("INSERT INTO todo (id, name) VALUES (?1, ?2)", (&todo.id, &todo.name));
+    match result {
+        Ok(_) => return Ok(DBSuccess),
+        Err(error) => return Err(InsertError::InsertError(error))
+    }
 }
 
+#[derive(Debug)]
 pub enum GetError {
     DBError(Error),
     NoResults,
@@ -42,13 +51,8 @@ impl From<Error> for GetError {
     }
 }
 
-pub fn get(id: &str) -> Result<Todo, GetError> {
-    let conn = match Connection::open("test.db") {
-        Ok(connection) => connection,
-        Err(error) => return Err(error.into())
-    };
-
-    let raw_statement = format!("SELECT * FROM test WHERE id={}", id);
+pub fn get(conn: &Connection, id: &str) -> Result<Todo, GetError> {
+    let raw_statement = format!("SELECT * FROM todo WHERE id='{}'", id);
     let mut statement = conn.prepare(raw_statement.as_str())?;
     let mut todo_iter = statement.query_map([], |row| {
         Ok(
@@ -67,3 +71,49 @@ pub fn get(id: &str) -> Result<Todo, GetError> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use crate::cli::Todo;
+    use super::*;
+    use uuid::Uuid;
+
+    #[test]
+    fn test_create_table() {
+        let conn = get_connection().unwrap();
+        create_table(&conn).unwrap();
+        drop_table(&conn);
+    }
+
+    #[test]
+    fn test_insert_todo() {
+        let conn = get_connection().unwrap();
+        create_table(&conn).unwrap();
+        let id = Uuid::new_v4().to_string();
+        let todo = Todo {
+            name: "test todo".into(),
+            id: id.into(),
+        };
+        insert(&conn, &todo).unwrap();
+        drop_table(&conn);
+    }
+
+    #[test]
+    fn test_get_todo() {
+        let conn = get_connection().unwrap();
+        create_table(&conn).unwrap();
+        let id = Uuid::new_v4().to_string();
+        let todo = Todo {
+            name: "test todo".into(),
+            id: id.clone(),
+        };
+        insert(&conn, &todo).unwrap();
+        let todo = get(&conn, id.as_str()).unwrap();
+        assert_eq!(todo.id, id);
+        assert_eq!(todo.name, "test todo".to_owned());
+        drop_table(&conn);
+    }
+
+    fn drop_table(conn: &Connection) {
+        conn.execute("DROP TABLE todo", ()).unwrap();
+    }
+}
