@@ -52,7 +52,7 @@ impl From<Error> for GetError {
 }
 
 pub fn get(conn: &Connection, id: &str) -> Result<Todo, GetError> {
-    let raw_statement = format!("SELECT * FROM todo WHERE id='{}'", id);
+    let raw_statement = format!("SELECT * FROM todo WHERE id like '%{}%'", id);
     let mut statement = conn.prepare(raw_statement.as_str())?;
     let mut todo_iter = statement.query_map([], |row| {
         Ok(
@@ -128,6 +128,23 @@ mod tests {
                 assert!(true)
             },
         }
+    }
+
+    #[test]
+    fn test_get_todo_with_id_substring() {
+        let conn = get_connection().unwrap();
+        create_table(&conn).unwrap();
+        let id = Uuid::new_v4().to_string();
+        let todo = Todo {
+            name: "test todo".into(),
+            id: id.clone(),
+        };
+        insert(&conn, &todo).unwrap();
+        let id_substring = id.clone().split('-').next().unwrap().to_owned();
+        let todo = get(&conn, &id_substring).unwrap();
+        drop_table(&conn);
+        assert_eq!(todo.id, id);
+        assert_eq!(todo.name, "test todo".to_owned());
     }
 
     fn drop_table(conn: &Connection) {
