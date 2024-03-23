@@ -108,9 +108,26 @@ mod tests {
         };
         insert(&conn, &todo).unwrap();
         let todo = get(&conn, id.as_str()).unwrap();
+        drop_table(&conn);
         assert_eq!(todo.id, id);
         assert_eq!(todo.name, "test todo".to_owned());
-        drop_table(&conn);
+    }
+
+    #[test]
+    fn test_get_todo_not_existing() {
+        let conn = get_connection().unwrap();
+        create_table(&conn).unwrap();
+        let id = Uuid::new_v4().to_string();
+        match get(&conn, id.as_str()) {
+            Ok(_) => {
+                drop_table(&conn);
+                assert!(false, "getting todo that doesn't exist should error")
+            },
+            Err(_) => {
+                drop_table(&conn);
+                assert!(true)
+            },
+        }
     }
 
     fn drop_table(conn: &Connection) {
