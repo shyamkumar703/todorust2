@@ -18,7 +18,8 @@ pub fn create_table(conn: &Connection) -> Result<DBSuccess, Error> {
     let _ = conn.execute(
         "CREATE TABLE IF NOT EXISTS todo (
             id text primary key, 
-            name text not null
+            name text not null,
+            is_complete integer not_null
         )",
        () 
     )?;
@@ -28,11 +29,7 @@ pub fn create_table(conn: &Connection) -> Result<DBSuccess, Error> {
 
 
 pub fn insert(conn: &Connection, todo: &Todo) -> Result<DBSuccess, InsertError> {
-    match create_table(conn) {
-        Err(error) => return Err(InsertError::CreationError(error)),
-        Ok(_) => (),
-    };
-    let result = conn.execute("INSERT INTO todo (id, name) VALUES (?1, ?2)", (&todo.id, &todo.name));
+    let result = conn.execute("INSERT INTO todo (id, name, is_complete) VALUES (?1, ?2, ?3)", (&todo.id, &todo.name, todo.get_is_complete_int()));
     match result {
         Ok(_) => return Ok(DBSuccess),
         Err(error) => return Err(InsertError::InsertError(error))
@@ -56,8 +53,8 @@ pub fn get(conn: &Connection, id: &str) -> Result<Todo, GetError> {
     let mut statement = conn.prepare(raw_statement.as_str())?;
     let mut todo_iter = statement.query_map([], |row| {
         Ok(
-            Todo { name: row.get(1)?, id: row.get(0)? }
-        )
+            Todo::new(row.get(1)?, row.get(2)?, row.get(0)?)
+          )
     })?;
 
     match todo_iter.next() {
@@ -69,6 +66,25 @@ pub fn get(conn: &Connection, id: &str) -> Result<Todo, GetError> {
         } 
         None => return Err(GetError::NoResults)
     }
+}
+
+pub fn get_all(conn: &Connection) -> Result<Vec<Todo>, GetError> {
+    let raw_statement = format!("SELECT * FROM todo");
+    let mut statement = conn.prepare(raw_statement.as_str())?;
+    let todo_iter = statement.query_map([], |row| {
+        Ok(
+            Todo::new(row.get(1)?, row.get(2)?, row.get(0)?)
+          )
+    })?;
+
+    let mut todo_vec: Vec<Todo> = vec![];
+    for todo_result in todo_iter {
+        if let Ok(todo) = todo_result {
+            todo_vec.push(todo);
+        }
+    }
+
+    Ok(todo_vec)
 }
 
 #[cfg(test)]
@@ -91,6 +107,7 @@ mod tests {
         let id = Uuid::new_v4().to_string();
         let todo = Todo {
             name: "test todo".into(),
+            is_complete: false,
             id: id.into(),
         };
         insert(&conn, &todo).unwrap();
@@ -104,6 +121,7 @@ mod tests {
         let id = Uuid::new_v4().to_string();
         let todo = Todo {
             name: "test todo".into(),
+            is_complete: false,
             id: id.clone(),
         };
         insert(&conn, &todo).unwrap();
@@ -111,6 +129,7 @@ mod tests {
         drop_table(&conn);
         assert_eq!(todo.id, id);
         assert_eq!(todo.name, "test todo".to_owned());
+        assert_eq!(todo.is_complete, false);
     }
 
     #[test]
@@ -137,6 +156,7 @@ mod tests {
         let id = Uuid::new_v4().to_string();
         let todo = Todo {
             name: "test todo".into(),
+            is_complete: false,
             id: id.clone(),
         };
         insert(&conn, &todo).unwrap();
@@ -145,6 +165,7 @@ mod tests {
         drop_table(&conn);
         assert_eq!(todo.id, id);
         assert_eq!(todo.name, "test todo".to_owned());
+        assert_eq!(todo.is_complete, false);
     }
 
     fn drop_table(conn: &Connection) {
