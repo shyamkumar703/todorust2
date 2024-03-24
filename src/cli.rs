@@ -13,6 +13,12 @@ pub struct GetTodos {
     pub id: Option<String>
 }
 
+#[derive(Parser, Debug)]
+pub struct MarkComplete {
+    #[arg(short, long)]
+    pub complete: String
+}
+
 #[derive(Debug)]
 pub struct Todo {
     pub name: String,

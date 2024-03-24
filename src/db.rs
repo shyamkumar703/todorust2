@@ -87,6 +87,12 @@ pub fn get_all(conn: &Connection) -> Result<Vec<Todo>, GetError> {
     Ok(todo_vec)
 }
 
+pub fn mark_complete(conn: &Connection, id: &str) -> Result<DBSuccess, Error> {
+    let raw_statement = format!("UPDATE todo SET is_complete = 1 WHERE id like '%{}%'", id);
+    let _ = conn.execute(&raw_statement, ())?;
+    Ok(DBSuccess)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::cli::Todo;
@@ -130,6 +136,22 @@ mod tests {
         assert_eq!(todo.id, id);
         assert_eq!(todo.name, "test todo".to_owned());
         assert_eq!(todo.is_complete, false);
+    }
+
+    #[test]
+    fn test_mark_todo_as_complete() {
+        let conn = get_connection().unwrap();
+        create_table(&conn).unwrap();
+        let id = Uuid::new_v4().to_string();
+        let todo = Todo {
+            name: "test todo".into(),
+            is_complete: false,
+            id: id.clone(),
+        };
+        insert(&conn, &todo).unwrap();
+        mark_complete(&conn, &id).unwrap();
+        let todo = get(&conn, &id).unwrap();
+        assert_eq!(todo.is_complete, true);
     }
 
     #[test]

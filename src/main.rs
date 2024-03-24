@@ -2,9 +2,9 @@ mod cli;
 mod db;
 
 use clap::Parser;
-use cli::{CreateTodo, GetTodos};
+use cli::{CreateTodo, GetTodos, MarkComplete};
 use cli::Todo;
-use db::{create_table, get, get_connection, insert, get_all};
+use db::{create_table, get, get_connection, insert, get_all, mark_complete};
 use rusqlite::Connection;
 
 fn main() {
@@ -25,6 +25,11 @@ fn main() {
 
     if let Ok(todo) = CreateTodo::try_parse() {
         execute_insert_todo(&conn, todo.into());
+        return;
+    }
+
+    if let Ok(mark_complete) = MarkComplete::try_parse() {
+        execute_mark_as_complete(&conn, mark_complete.complete);
         return;
     }
 
@@ -52,4 +57,11 @@ fn execute_insert_todo(conn: &Connection, todo: Todo) {
         Ok(_) => println!("Successfully added todo {:?}", todo),
         Err(error) => println!("ERROR: {:?}", error),
     }
+}
+
+fn execute_mark_as_complete(conn: &Connection, id: String) {
+    match mark_complete(conn, &id) {
+        Ok(_) => println!("Marked {} as complete.", &id),
+        Err(error) => println!("ERROR: {:?}", error),
+    } 
 }
