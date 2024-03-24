@@ -152,6 +152,7 @@ mod tests {
         mark_complete(&conn, &id).unwrap();
         let todo = get(&conn, &id).unwrap();
         assert_eq!(todo.is_complete, true);
+        drop_table(&conn);
     }
 
     #[test]
