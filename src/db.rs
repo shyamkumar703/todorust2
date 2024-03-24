@@ -11,7 +11,7 @@ pub enum InsertError {
 pub struct DBSuccess;
 
 pub fn get_connection() -> Result<Connection, Error> {
-   Connection::open("test.db")
+    Connection::open("test.db")
 }
 
 pub fn create_table(conn: &Connection) -> Result<DBSuccess, Error> {
@@ -20,9 +20,9 @@ pub fn create_table(conn: &Connection) -> Result<DBSuccess, Error> {
             id text primary key, 
             name text not null,
             is_complete integer not_null
-        )",
-       () 
-    )?;
+            )",
+            () 
+            )?;
 
     Ok(DBSuccess)
 }

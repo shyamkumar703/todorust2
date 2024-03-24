@@ -15,7 +15,7 @@ fn main() {
             return;
         }
     };
-    
+
     create_table(&conn).unwrap();
 
     if let Ok(value) = GetTodos::try_parse() {
